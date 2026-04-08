@@ -1,14 +1,14 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:models="clr-namespace:Playlist_Builder.Models"
              x:Class="Playlist_Builder.MainPage"
              NavigationPage.HasNavigationBar="False"
              BackgroundColor="#121212"
-             Padding="10, 0, 10, 2">
+             Padding="10, 0, 10, 0">
 			 
     <ContentPage.Content>
-        <Grid RowDefinitions="Auto, *" RowSpacing="10">
-            <!-- Üst Buton -->
+        <Grid RowDefinitions="Auto, *" RowSpacing="10" Margin="0, 10, 0, 0">
             <Button Text="Çalma Listesi Oluştur"
                     BackgroundColor="#8A2BE2"
                     TextColor="White"
@@ -16,11 +16,9 @@
                     Padding="15,10"
                     HorizontalOptions="Center"
                     Clicked="CreatePlaylistButton_Clicked"/>
-
-            <!-- Playlist CollectionView -->
+            
             <CollectionView x:Name="PlaylistCollectionView"
-                            ItemsSource="{Binding Playlists}"
-                            SelectionMode="None"
+                            ItemsSource="{Binding Playlists}"  SelectionMode="None"
                             Grid.Row="1">
                 <CollectionView.ItemsLayout>
                     <GridItemsLayout Orientation="Vertical"
@@ -30,7 +28,7 @@
                 </CollectionView.ItemsLayout>
 
                 <CollectionView.ItemTemplate>
-                    <DataTemplate>
+                    <DataTemplate x:DataType="models:Playlist">
                         <Border BackgroundColor="#1E1E1E" Padding="10">
                             <Border.StrokeShape>
                                 <RoundRectangle CornerRadius="12"/>

@@ -1,18 +1,26 @@
 using System.Collections.ObjectModel;
 using Playlist_Builder.Helpers;
 using Playlist_Builder.Models;
-using Uri = Android.Net.Uri;
 
 namespace Playlist_Builder;
 
+[QueryProperty(nameof(IncomingPlaylists), "Playlists")]
 public partial class CreatePlaylistPage : ContentPage
 {
-    private readonly ObservableCollection<Playlist> _playlists;
+    private ObservableCollection<Playlist> _playlists;
+    public ObservableCollection<Playlist> IncomingPlaylists
+    {
+        get => _playlists;
+        set 
+        { 
+            _playlists = value; 
+            OnPropertyChanged();
+        }
+    }
     
-    public CreatePlaylistPage(ObservableCollection<Playlist> playlists)
+    public CreatePlaylistPage()
     {
         InitializeComponent();
-        _playlists = playlists;
     }
     
     private async void PickFolderButton_Clicked(object sender, EventArgs e)
@@ -90,10 +98,10 @@ public partial class CreatePlaylistPage : ContentPage
         ReturnToMainPage();
     }
 
-    private void ReturnToMainPage()
+    private async void ReturnToMainPage()
     {
         KeyboardHelper.HideKeyboard();
-        // return to main page
+        await Shell.Current.GoToAsync("..");
     }
 
     private async Task DisplayAlert(string title, string message)

@@ -6,7 +6,7 @@ namespace Playlist_Builder;
 
 public partial class MainPage : ContentPage
 {
-    private ObservableCollection<Playlist> Playlists { get; set; }
+    public ObservableCollection<Playlist> Playlists { get; set; }
 
     public MainPage()
     {
@@ -17,25 +17,23 @@ public partial class MainPage : ContentPage
 
     private async void CreatePlaylistButton_Clicked(object sender, EventArgs e)
     {
-        var page = new CreatePlaylistPage(Playlists);
-        var mainPage = new MainPage();
-        // route to page, MainPage should be returnable
+        var navigationParameter = new Dictionary<string, object>
+        {
+            { "Playlists",  Playlists }
+        };
+        
+        await Shell.Current.GoToAsync(nameof(CreatePlaylistPage), navigationParameter);
     }
 
     private async void OnPlaylistTapped(object sender, TappedEventArgs e)
     {
         if (sender is not Border { BindingContext: Playlist tappedPlaylist }) return;
         
-        var page = new PlaylistPage(tappedPlaylist);
-        var mainPage = new MainPage();
-        // route to page, MainPage should be returnable
-    }
-
-    private async Task DisplayAlert(string title, string message)
-    {
-        if (this.Parent is ContentPage page)
+        var navigationParameter = new Dictionary<string, object>
         {
-            await page.DisplayAlertAsync(title, message, "Tamam");
-        }
+            { "SelectedPlaylist", tappedPlaylist }
+        };
+        
+        await Shell.Current.GoToAsync(nameof(PlaylistPage), navigationParameter);
     }
 }

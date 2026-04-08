@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Android.App;
 using Android.Content;
 using AndroidX.DocumentFile.Provider;
 using Playlist_Builder.Models;
@@ -36,14 +37,12 @@ public partial class AndroidFileService
 
         try
         {
-            // Daha önce izin verilmiş mi kontrol et
             var existing = activity.ContentResolver?.PersistedUriPermissions;
             if (existing != null && existing.Any(p => p.Uri?.Equals(folderUri) == true && p.IsReadPermission && p.IsWritePermission))
             {
                 return Task.FromResult(true);
             }
-
-            // Yoksa izin al
+            
             activity.ContentResolver?.TakePersistableUriPermission(
                 folderUri,
                 ActivityFlags.GrantReadUriPermission | ActivityFlags.GrantWriteUriPermission
@@ -176,5 +175,21 @@ public partial class AndroidFileService
     private static Uri? ParseToUri(string path)
     {
         return Uri.Parse(path);
+    }
+    
+    public static void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+    {
+        if (_tcs == null) return;
+
+        if (requestCode == 1001 && resultCode == Result.Ok && data?.Data != null)
+        {
+            _tcs.SetResult(data.Data);
+        }
+        else
+        {
+            _tcs.SetResult(null);
+        }
+
+        _tcs = null;
     }
 }
