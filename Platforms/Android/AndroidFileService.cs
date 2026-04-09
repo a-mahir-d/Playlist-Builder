@@ -267,7 +267,7 @@ public partial class AndroidFileService
         var playlistDir = root.FindFile(playlist.Name) ?? root.CreateDirectory(playlist.Name);
         if (playlistDir == null) return (false, "SaveSong: Çalma listesi klasörü bulunamadı");
         
-        var(success, errorMessage) = SaveOpus(opusBytes, playlistDir, $"{song.Name}_{song.Artist}");
+        var(success, errorMessage) = SaveOpus(opusBytes, playlistDir, $"{song.Name}");
         return !success ? (false, "SaveSong: " + errorMessage) : (true, "");
     }
     

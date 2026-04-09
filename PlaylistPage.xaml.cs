@@ -277,6 +277,7 @@ public partial class PlaylistPage : ContentPage
             if (successStatus)
             {
                 await DisplayAlert("Hata", "songs.json güncellenemedi");
+                return;
             }
             
             FileHelper.UpdatePlaylist(Playlist);
