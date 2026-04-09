@@ -172,6 +172,155 @@ public partial class AndroidFileService
         }
     }
 
+    public static async Task<List<Song>> PickAndProcessJsonFile()
+    {
+        try
+        {
+            var options = new PickOptions
+            {
+                PickerTitle = "Lütfen bir JSON dosyası seçin",
+                FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+                {
+                    { DevicePlatform.Android, ["application/json"] }
+                })
+            };
+
+            var result = await FilePicker.Default.PickAsync(options);
+            if (result == null) return [];
+
+            await using var stream = await result.OpenReadAsync();
+            using var reader = new StreamReader(stream);
+            var jsonContent = await reader.ReadToEndAsync();
+            return JsonSerializer.Deserialize<List<Song>>(jsonContent) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+    
+    public static bool AddSongsToPlaylist(List<Song> newSongs, string playlistDownloadFolderPath, string playlistName)
+    {
+        var context = Platform.CurrentActivity;
+        if (context == null) return false;
+    
+        var uriPath = ParseToUri(playlistDownloadFolderPath);
+        if (uriPath == null) return false;
+        
+        var root = DocumentFile.FromTreeUri(context, uriPath);
+        if (root == null) return false;
+
+        var playlistDir = root.FindFile(playlistName);
+        if (playlistDir == null) return false;
+
+        var files = playlistDir.ListFiles();
+        if (files == null) return false;
+
+        var songsFile = playlistDir.FindFile("songs.json");
+        if (songsFile?.Uri == null) return false;
+        
+        List<Song> existingSongs = [];
+        using var stream = context.ContentResolver?.OpenInputStream(songsFile.Uri);
+        if (stream == null) return false;
+        
+        using var reader = new StreamReader(stream);
+        var json = reader.ReadToEnd();
+        var list = JsonSerializer.Deserialize<List<Song>>(json);
+        if (list != null)
+            existingSongs = list;
+        
+        songsFile.Delete();
+
+        var jsonFile = playlistDir.CreateFile("application/json", "songs.json");
+        if (jsonFile?.Uri == null) return false;
+
+        try
+        {
+            json = JsonSerializer.Serialize(existingSongs.Concat(newSongs).ToList());
+
+            using var newStream = context.ContentResolver?.OpenOutputStream(jsonFile.Uri);
+            if (newStream == null) return false;
+
+            using var writer = new StreamWriter(newStream);
+            writer.Write(json);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+    
+    public static void DeletePlaylistFolder(string playlistDownloadFolderPath, string playlistName)
+    {
+        var context = Platform.CurrentActivity;
+        if (context == null) return;
+        
+        var uriPath = ParseToUri(playlistDownloadFolderPath);
+        if (uriPath == null) return;
+
+        var root = DocumentFile.FromTreeUri(context, uriPath);
+        if (root == null) return;
+
+        var playlistDir = root.FindFile(playlistName);
+        if (playlistDir == null) return;
+
+        if (playlistDir.Uri != null && !playlistDir.Uri.Equals(root.Uri))
+        {
+            playlistDir.Delete();
+        }
+    }
+    
+    public static void DeleteSong(string playlistDownloadFolderPath, string playlistName, string songName, bool isDownloaded)
+    {
+        var context = Platform.CurrentActivity;
+        if (context == null) return;
+        
+        var uriPath = ParseToUri(playlistDownloadFolderPath);
+        if (uriPath == null) return;
+
+        var root = DocumentFile.FromTreeUri(context, uriPath);
+        if (root == null) return;
+
+        var playlistDir = root.FindFile(playlistName);
+        if (playlistDir == null) return;
+
+        if (isDownloaded)
+        {
+            var songFile = root.FindFile(songName);
+            songFile?.Delete();
+        }
+
+        var songs = ReadSongsFile(playlistDownloadFolderPath, playlistName);
+        var songToBeDeleted = songs.FirstOrDefault(s => s.Name == songName);
+        if(songToBeDeleted == null) return;
+        
+        songs.Remove(songToBeDeleted);
+        
+        var songsFile = playlistDir.FindFile("songs.json");
+        if (songsFile?.Uri == null) return;
+        
+        songsFile.Delete();
+
+        var jsonFile = playlistDir.CreateFile("application/json", "songs.json");
+        if (jsonFile?.Uri == null) return;
+
+        try
+        {
+            var json = JsonSerializer.Serialize(songs);
+
+            using var newStream = context.ContentResolver?.OpenOutputStream(jsonFile.Uri);
+            if (newStream == null) return;
+
+            using var writer = new StreamWriter(newStream);
+            writer.Write(json);
+        }
+        catch (Exception)
+        {
+            // ignored
+        }
+    }
+    
     private static Uri? ParseToUri(string path)
     {
         return Uri.Parse(path);
@@ -192,4 +341,5 @@ public partial class AndroidFileService
 
         _tcs = null;
     }
+    
 }

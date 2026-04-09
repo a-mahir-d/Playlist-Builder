@@ -2,9 +2,155 @@
 
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:converters="clr-namespace:Playlist_Builder.Converters"
+             xmlns:models="clr-namespace:Playlist_Builder.Models"
+             xmlns:playlistBuilder="clr-namespace:Playlist_Builder"
              x:Class="Playlist_Builder.PlaylistPage"
-             Shell.NavBarIsVisible="False">
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="#121212">
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:HourConverter x:Key="HourConverter"/>
+            <converters:SongTitleConverter x:Key="SongTitleConverter"/>
+            <converters:SecondsToDurationConverter x:Key="SecondsToDurationConverter"/>
+        </ResourceDictionary>
+    </ContentPage.Resources>
+    
     <ContentPage.Content>
-        
+        <Grid BackgroundColor="#121212" Padding="5,0,5,0">
+        <Grid RowDefinitions="40,130,40,*" x:DataType="models:Playlist">
+            <SearchBar x:Name="PlaylistSearchBar"
+                       Grid.Row="0"
+                       Placeholder="Şarkı ara..."
+                       TextColor="White"
+                       PlaceholderColor="Gray"
+                       BackgroundColor="Transparent"
+                       Margin="0,0,15,0"
+                       VerticalOptions="Center"
+                       HorizontalOptions="Start"
+                       TextChanged="PlaylistSearchBar_TextChanged"
+                       Focused="PlaylistSearchBar_Focused"/>
+
+            <Label Text="{Binding Icon}"
+                   Grid.Row="1"
+                   Margin="0,5,0,0"
+                   FontSize="100"
+                   HorizontalOptions="Center"
+                   VerticalOptions="Center"
+                   HorizontalTextAlignment="Center"/>
+            
+            <Grid Grid.Row="2" BackgroundColor="Transparent"
+                  ColumnDefinitions="*,30,80,30"
+                  RowDefinitions="*"
+                  Margin="10,10,20,0">
+
+                <Label Text="{Binding Name}"
+                       x:Name="PlaylistTitleLabel"
+                       TextColor="White"
+                       FontSize="20"
+                       Grid.Column="0"
+                       VerticalOptions="Center"
+                       HorizontalTextAlignment="Start"/>
+
+                <Label Text="➕"
+                       Grid.Column="1"
+                       VerticalOptions="Center"
+                       HorizontalOptions="Center"
+                       FontSize="20">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnSongAddTapped"/>
+                    </Label.GestureRecognizers>
+                </Label>
+
+                <Label Text="{Binding TotalHours, Converter={StaticResource HourConverter}}"
+                       x:Name="PlaylistTotalHoursLabel"
+                       TextColor="LightGray"
+                       FontSize="12"
+                       Grid.Column="2"
+                       VerticalOptions="Center"
+                       HorizontalTextAlignment="Center"/>
+
+                <Label Text="🗑️"
+                       Grid.Column="3"
+                       VerticalOptions="Center"
+                       HorizontalOptions="End"
+                       FontSize="20">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnPlaylistDeleteTapped"/>
+                    </Label.GestureRecognizers>
+                </Label>
+            </Grid>
+
+            <CollectionView Grid.Row="3"
+                            x:Name="SongsCollectionView"
+                            ItemsSource="{Binding FilteredSongs}"
+                            SelectionMode="None"
+                            BackgroundColor="Transparent"
+                            Margin="10,10,0,10" x:DataType="playlistBuilder:PlaylistPage">
+
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid ColumnDefinitions="40,*,40,30"
+                              HeightRequest="50"
+                              Margin="0,0,20,0">
+                            
+                            <Label Text="{Binding IsDownloaded}"
+                                   Grid.Column="0"
+                                   VerticalOptions="Center"
+                                   HorizontalOptions="Start"
+                                   FontSize="16">
+                            </Label>
+                            
+                            <StackLayout Grid.Column="1" Orientation="Vertical" Spacing="2" VerticalOptions="Center">
+                                <Label Text="{Binding Name}"
+                                       FontSize="16"
+                                       TextColor="White"
+                                       LineBreakMode="TailTruncation"/>
+                                <Label Text="{Binding Artist}"
+                                       FontSize="12"
+                                       TextColor="LightGray"
+                                       LineBreakMode="TailTruncation"/>
+                            </StackLayout>
+                            
+                            <Label Grid.Column="2"
+                                   Text="{Binding DurationInSeconds, Converter={StaticResource SecondsToDurationConverter}}"
+                                   FontSize="12"
+                                   TextColor="LightGray"
+                                   VerticalOptions="Center"
+                                   HorizontalOptions="Start"/>
+                            
+                            <Label Grid.Column="3"
+                                   Text="❌"
+                                   VerticalOptions="Center"
+                                   HorizontalOptions="End"
+                                   FontSize="20">
+                                <Label.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnSongDeleteTapped" />
+                                </Label.GestureRecognizers>
+                            </Label>
+
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+
+            </CollectionView>
+        </Grid>
+
+        <Grid x:Name="LoadingOverlay"
+              BackgroundColor="#8A2BE2"
+              IsVisible="False"
+              HorizontalOptions="Fill"
+              VerticalOptions="Fill"
+              InputTransparent="False">
+
+            <Grid HorizontalOptions="Center" VerticalOptions="Center" RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="*">
+                <ActivityIndicator IsRunning="True" Color="White" WidthRequest="50" HeightRequest="50" Grid.Row="0"/>
+                <Label Text="İndiriliyor..." TextColor="White" FontSize="16" HorizontalOptions="Center" Grid.Row="1" Margin="0,10,0,0"/>
+                <Label x:Name="ProgressLabel" Text="İlerleme: 0/1" TextColor="White" FontSize="16" HorizontalOptions="Center" Grid.Row="2" Margin="0,5,0,0"/>
+                <Label x:Name="ErrorLabel" Text="Hata: 0" TextColor="White" FontSize="16" HorizontalOptions="Center" Grid.Row="3" Margin="0,5,0,0"/>
+            </Grid>
+        </Grid>
+
+    </Grid>
     </ContentPage.Content>
 </ContentPage>
