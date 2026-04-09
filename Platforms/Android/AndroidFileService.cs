@@ -2,8 +2,11 @@ using System.Text;
 using System.Text.Json;
 using Android.App;
 using Android.Content;
+using Android.OS;
+using Android.Provider;
 using AndroidX.DocumentFile.Provider;
 using Playlist_Builder.Models;
+using Environment = System.Environment;
 using Uri = Android.Net.Uri;
 
 namespace Playlist_Builder;
@@ -230,22 +233,140 @@ public partial class AndroidFileService
             existingSongs = list;
         
         songsFile.Delete();
-
-        var jsonFile = playlistDir.CreateFile("application/json", "songs.json");
-        if (jsonFile?.Uri == null) return false;
+        
+        var newSongsFile = playlistDir.CreateFile("application/json", "songs.json");
+        if (newSongsFile?.Uri == null) return false;
 
         try
         {
             json = JsonSerializer.Serialize(existingSongs.Concat(newSongs).ToList());
 
-            using var newStream = context.ContentResolver?.OpenOutputStream(jsonFile.Uri);
+            using var newStream = context.ContentResolver?.OpenOutputStream(newSongsFile.Uri);
             if (newStream == null) return false;
 
             using var writer = new StreamWriter(newStream);
             writer.Write(json);
             return true;
         }
-        catch (Exception)
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+            return false;
+        }
+    }
+    
+    public static (bool, string) SaveOpus(byte[] opusBytes, Song song, Playlist playlist)
+    {
+        var context = Platform.CurrentActivity;
+        if (context == null || string.IsNullOrEmpty(playlist.DownloadFolder)) return (false, "SaveSong: Context bulunamadı");
+
+        var treeUri = Uri.Parse(playlist.DownloadFolder);
+        var root = DocumentFile.FromTreeUri(context, treeUri);
+        if (root == null) return (false, "SaveSong: İndirme klasörü bulunamadı");
+
+        var playlistDir = root.FindFile(playlist.Name) ?? root.CreateDirectory(playlist.Name);
+        if (playlistDir == null) return (false, "SaveSong: Çalma listesi klasörü bulunamadı");
+        
+        var(success, errorMessage) = SaveOpus(opusBytes, playlistDir, $"{song.Name}_{song.Artist}");
+        return !success ? (false, "SaveSong: " + errorMessage) : (true, "");
+    }
+    
+    private static (bool, string) SaveOpus(byte[] opusBytes, DocumentFile playlistDir, string fileName)
+    {
+        try
+        {
+            var context = Platform.CurrentActivity;
+            if (context == null) return (false, "SaveOpus: Context bulunamadı");
+
+            var opusFile = playlistDir.CreateFile("audio/opus", fileName + ".opus");
+            if (opusFile?.Uri == null) return (false, "SaveOpus: .opus oluşturulamadı");
+
+            using var stream = context.ContentResolver?.OpenOutputStream(opusFile.Uri);
+            if (stream == null) return (false, "SaveOpus: stream bulunamadı");
+
+            stream.Write(opusBytes, 0, opusBytes.Length);
+            stream.Flush();
+            return (true, "");
+        }
+        catch (Exception ex)
+        {
+            return (false, "SaveOpus: " + ex.Message);
+        }
+    }
+    
+    public static bool SaveToDownloads(Context context, string filePath, string displayName)
+    {
+        try
+        {
+            var sdk = (int)Build.VERSION.SdkInt;
+            if (sdk >= 29)
+            {
+                var values = new ContentValues();
+                values.Put(MediaStore.IMediaColumns.DisplayName, displayName);
+                values.Put(MediaStore.IMediaColumns.MimeType, "text/plain");
+                values.Put("relative_path", "Download/");
+
+#pragma warning disable CA1416
+                var uri = context.ContentResolver?.Insert(MediaStore.Downloads.ExternalContentUri, values);
+#pragma warning restore CA1416
+                if (uri == null) return false;
+
+                using var input = System.IO.File.OpenRead(filePath);
+                using var output = context.ContentResolver?.OpenOutputStream(uri);
+                if (output == null) return false;
+
+                input.CopyTo(output);
+                return true;
+            }
+        }
+        catch
+        {
+            // ignored
+        }
+
+        return false;
+    }
+    
+    public static bool UpdateNewlyDownloadedSongs(List<Song> songs, List<Song> songsToBeUpdated, string playlistDownloadFolderPath, string playlistName)
+    {
+        var context = Platform.CurrentActivity;
+        if (context == null) return false;
+        
+        var playlistDownloadFolderUri = ParseToUri(playlistDownloadFolderPath);
+        if (playlistDownloadFolderUri == null) return false;
+
+        var root = DocumentFile.FromTreeUri(context, playlistDownloadFolderUri);
+        if (root == null) return false;
+
+        var playlistDir = root.FindFile(playlistName);
+        if (playlistDir == null) return false;
+
+        var songsFile = playlistDir.FindFile("songs.json");
+        if (songsFile?.Uri == null) return false;
+
+        foreach (var updatedSong in songsToBeUpdated)
+        {
+            var originalSong = songs.FirstOrDefault(s => s.Name.Equals(updatedSong.Name));
+            if(originalSong == null) continue;
+            
+            originalSong.YoutubeUrl = updatedSong.YoutubeUrl;
+            originalSong.DurationInSeconds = updatedSong.DurationInSeconds;
+            originalSong.IsDownloaded = true;
+        }
+
+        try
+        {
+            using var stream = context.ContentResolver?.OpenOutputStream(songsFile.Uri, "rwt");
+            if (stream == null) return false;
+
+            using var writer = new StreamWriter(stream, Encoding.UTF8);
+            var updatedJson = JsonSerializer.Serialize(songs);
+            writer.Write(updatedJson);
+            writer.Flush();
+
+            return true;
+        }
+        catch
         {
             return false;
         }

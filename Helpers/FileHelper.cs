@@ -40,7 +40,7 @@ public class FileHelper
         return true;
     }
     
-    private static void UpdatePlaylist(Playlist playlist)
+    public static void UpdatePlaylist(Playlist playlist)
     {
         try
         {

@@ -3,22 +3,21 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:converters="clr-namespace:Playlist_Builder.Converters"
-             xmlns:models="clr-namespace:Playlist_Builder.Models"
              xmlns:playlistBuilder="clr-namespace:Playlist_Builder"
+             xmlns:models="clr-namespace:Playlist_Builder.Models"
              x:Class="Playlist_Builder.PlaylistPage"
              Shell.NavBarIsVisible="False"
              BackgroundColor="#121212">
     <ContentPage.Resources>
         <ResourceDictionary>
             <converters:HourConverter x:Key="HourConverter"/>
-            <converters:SongTitleConverter x:Key="SongTitleConverter"/>
             <converters:SecondsToDurationConverter x:Key="SecondsToDurationConverter"/>
         </ResourceDictionary>
     </ContentPage.Resources>
     
     <ContentPage.Content>
         <Grid BackgroundColor="#121212" Padding="5,0,5,0">
-        <Grid RowDefinitions="40,130,40,*" x:DataType="models:Playlist">
+        <Grid RowDefinitions="40,130,40,*" x:DataType="playlistBuilder:PlaylistPage">
             <SearchBar x:Name="PlaylistSearchBar"
                        Grid.Row="0"
                        Placeholder="Şarkı ara..."
@@ -31,7 +30,7 @@
                        TextChanged="PlaylistSearchBar_TextChanged"
                        Focused="PlaylistSearchBar_Focused"/>
 
-            <Label Text="{Binding Icon}"
+            <Label Text="{Binding Playlist.Icon}"
                    Grid.Row="1"
                    Margin="0,5,0,0"
                    FontSize="100"
@@ -40,11 +39,11 @@
                    HorizontalTextAlignment="Center"/>
             
             <Grid Grid.Row="2" BackgroundColor="Transparent"
-                  ColumnDefinitions="*,30,80,30"
+                  ColumnDefinitions="*,30,30,80,30"
                   RowDefinitions="*"
                   Margin="10,10,20,0">
 
-                <Label Text="{Binding Name}"
+                <Label Text="{Binding Playlist.Name}"
                        x:Name="PlaylistTitleLabel"
                        TextColor="White"
                        FontSize="20"
@@ -61,17 +60,28 @@
                         <TapGestureRecognizer Tapped="OnSongAddTapped"/>
                     </Label.GestureRecognizers>
                 </Label>
+                
+                <Image x:Name="DownloadImage"
+                       Source="download.png"
+                       WidthRequest="24" HeightRequest="24"
+                       Grid.Column="2"
+                       VerticalOptions="Center"
+                       HorizontalOptions="Center">
+                    <Image.GestureRecognizers>
+                        <TapGestureRecognizer Tapped="OnDownloadAllTapped"/>
+                    </Image.GestureRecognizers>
+                </Image>
 
-                <Label Text="{Binding TotalHours, Converter={StaticResource HourConverter}}"
+                <Label Text="{Binding Playlist.TotalHours, Converter={StaticResource HourConverter}}"
                        x:Name="PlaylistTotalHoursLabel"
                        TextColor="LightGray"
                        FontSize="12"
-                       Grid.Column="2"
+                       Grid.Column="3"
                        VerticalOptions="Center"
                        HorizontalTextAlignment="Center"/>
 
                 <Label Text="🗑️"
-                       Grid.Column="3"
+                       Grid.Column="4"
                        VerticalOptions="Center"
                        HorizontalOptions="End"
                        FontSize="20">
@@ -89,17 +99,46 @@
                             Margin="10,10,0,10" x:DataType="playlistBuilder:PlaylistPage">
 
                 <CollectionView.ItemTemplate>
-                    <DataTemplate>
+                    <DataTemplate x:DataType="models:Song">
                         <Grid ColumnDefinitions="40,*,40,30"
                               HeightRequest="50"
                               Margin="0,0,20,0">
                             
-                            <Label Text="{Binding IsDownloaded}"
-                                   Grid.Column="0"
-                                   VerticalOptions="Center"
-                                   HorizontalOptions="Start"
-                                   FontSize="16">
-                            </Label>
+                            <Border Grid.Column="0"
+                                    WidthRequest="24"
+                                    HeightRequest="24"
+                                    VerticalOptions="Center"
+                                    HorizontalOptions="Start"
+                                    StrokeShape="RoundRectangle 12">
+                                <Border.Stroke>Transparent</Border.Stroke>
+
+                                <Border.BackgroundColor>#FF3B30</Border.BackgroundColor>
+                                <Border.InputTransparent>False</Border.InputTransparent>
+
+                                <Label TextColor="White" 
+                                       HorizontalOptions="Center" 
+                                       VerticalOptions="Center"
+                                       FontSize="14"
+                                       FontAttributes="Bold">
+                                    <Label.Text>-</Label.Text>
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsDownloaded}" Value="True">
+                                            <Setter Property="Text" Value="+" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnSongDownloadTapped" />
+                                </Border.GestureRecognizers>
+
+                                <Border.Triggers>
+                                    <DataTrigger TargetType="Border" Binding="{Binding IsDownloaded}" Value="True">
+                                        <Setter Property="BackgroundColor" Value="#4CD964" />
+                                        <Setter Property="InputTransparent" Value="True" />
+                                    </DataTrigger>
+                                </Border.Triggers>
+                            </Border>
                             
                             <StackLayout Grid.Column="1" Orientation="Vertical" Spacing="2" VerticalOptions="Center">
                                 <Label Text="{Binding Name}"

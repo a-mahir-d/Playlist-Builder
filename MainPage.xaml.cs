@@ -14,6 +14,20 @@ public partial class MainPage : ContentPage
         Playlists = FileHelper.LoadPlaylists();
         this.BindingContext = this;
     }
+    
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        Refresh();
+    }
+    
+    private void Refresh()
+    {
+        Playlists.Clear();
+        var loaded = FileHelper.LoadPlaylists();
+        foreach (var p in loaded)
+            Playlists.Add(p);
+    }
 
     private async void CreatePlaylistButton_Clicked(object sender, EventArgs e)
     {

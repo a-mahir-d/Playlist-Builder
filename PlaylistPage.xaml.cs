@@ -1,10 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using Playlist_Builder.Converters;
 using Playlist_Builder.Helpers;
 using Playlist_Builder.Models;
@@ -14,45 +10,43 @@ namespace Playlist_Builder;
 [QueryProperty(nameof(SelectedPlaylist), "SelectedPlaylist")]
 public partial class PlaylistPage : ContentPage
 {
-    private Playlist _playlist;
+    public Playlist Playlist  { get; set; }
     public Playlist SelectedPlaylist
     {
-        get => _playlist;
+        get => Playlist;
         set 
         { 
-            _playlist = value; 
+            Playlist = value; 
             OnPropertyChanged();
             LoadSongs();
         }
     }
     
     private List<Song> _songs;
-    public Playlist Playlist => _playlist;
     public ObservableCollection<Song> FilteredSongs { get; set; }
-    public List<Song> Songs { get; set; }
-    public string PcIp = "";
+    private string BackendIp = "";
     
     public PlaylistPage()
     {
         InitializeComponent();
-
-        BindingContext = new
-        {
-            Page = this,
-            Playlist = _playlist
-        };
+        _songs = [];
+        FilteredSongs = [];
+        BindingContext = this;
     }
 
     private void LoadSongs()
     {
-        _songs = AndroidFileService.ReadSongsFile(_playlist.DownloadFolder, _playlist.Name);
-
-        if (Songs == null || Songs.Count == 0)
+        if (Playlist == null) return;
+        
+        _songs = AndroidFileService.ReadSongsFile(Playlist.DownloadFolder, Playlist.Name);
+        FilteredSongs.Clear();
+        foreach (var song in _songs)
         {
-            Songs = [];
+            FilteredSongs.Add(song);
         }
-
-        FilteredSongs = [.. Songs];
+        
+        OnPropertyChanged(nameof(Playlist));
+        OnPropertyChanged(nameof(SelectedPlaylist));
     }
     
     private void PlaylistSearchBar_TextChanged(object sender, TextChangedEventArgs e)
@@ -62,8 +56,8 @@ public partial class PlaylistPage : ContentPage
         FilteredSongs.Clear();
 
         var filtered = string.IsNullOrEmpty(searchText)
-            ? Songs
-            : Songs.Where(s => s.Name.Contains(searchText, StringComparison.CurrentCultureIgnoreCase) || s.Artist.Contains(searchText, StringComparison.CurrentCultureIgnoreCase));
+            ? _songs
+            : _songs.Where(s => s.Name.Contains(searchText, StringComparison.CurrentCultureIgnoreCase) || s.Artist.Contains(searchText, StringComparison.CurrentCultureIgnoreCase));
 
         foreach (var song in filtered)
             FilteredSongs.Add(song);
@@ -86,9 +80,9 @@ public partial class PlaylistPage : ContentPage
             var jsonSongs = await AndroidFileService.PickAndProcessJsonFile();
             if (jsonSongs.Count == 0) return;
             
-            if (Songs.Count > 0)
+            if (_songs.Count > 0)
             {
-                var existingSongNames = new HashSet<string>(Songs.Select(s => s.Name), StringComparer.OrdinalIgnoreCase);
+                var existingSongNames = new HashSet<string>(_songs.Select(s => s.Name), StringComparer.OrdinalIgnoreCase);
                 foreach (var jsonSong in jsonSongs)
                 {
                     if (existingSongNames.Contains(jsonSong.Name)) continue;
@@ -123,7 +117,7 @@ public partial class PlaylistPage : ContentPage
                 return;
             }
             
-            var artist = await DisplayPrompt("Yeni şarkı�", "Şarkıcı/Grup adını girin:");
+            var artist = await DisplayPrompt("Yeni şarkı", "Şarkıcı/Grup adını girin:");
             if (string.IsNullOrWhiteSpace(artist))
                 return;
             
@@ -134,14 +128,14 @@ public partial class PlaylistPage : ContentPage
             newSongs.Add(new Song { Name = songName, Artist = artist, YoutubeUrl = youtubeUrl, DurationInSeconds = 0 });
         }
         
-        var success = AndroidFileService.AddSongsToPlaylist(newSongs, _playlist.DownloadFolder, _playlist.Name);
+        var success = AndroidFileService.AddSongsToPlaylist(newSongs, Playlist.DownloadFolder, Playlist.Name);
         if (!success)
         {
             await DisplayAlert("Hata", "Şarkılar eklenemedi.");
             return;
         }
 
-        success = FileHelper.AddSongsToPlaylist(_playlist, 0, newSongs.Count);
+        success = FileHelper.AddSongsToPlaylist(Playlist, 0, newSongs.Count);
         if (!success)
         {
             await DisplayAlert("Hata", "Playlist bilgisi güncellenemedi.");
@@ -149,7 +143,7 @@ public partial class PlaylistPage : ContentPage
         }
 
 
-        Songs.AddRange(newSongs);
+        _songs.AddRange(newSongs);
         RewriteFilteredSongs();
     }
     
@@ -160,8 +154,8 @@ public partial class PlaylistPage : ContentPage
         var answer = await DisplayAlertWithAnswer("Uyarı", "Çalma listesi silinecektir. Onaylıyor musunuz?");
         if (!answer) return;
 
-        AndroidFileService.DeletePlaylistFolder(_playlist.DownloadFolder, _playlist.Name);
-        FileHelper.DeletePlaylist(_playlist.Name);
+        AndroidFileService.DeletePlaylistFolder(Playlist.DownloadFolder, Playlist.Name);
+        FileHelper.DeletePlaylist(Playlist.Name);
         ReturnToMainPage();
     }
     
@@ -176,32 +170,195 @@ public partial class PlaylistPage : ContentPage
         var answer = await DisplayAlertWithAnswer("Uyarı", $"{song.Name} silinecektir. Onaylıyor musunuz?");
         if(!answer) return;
 
-        AndroidFileService.DeleteSong(_playlist.DownloadFolder, _playlist.Name, song.Name, song.IsDownloaded);
+        AndroidFileService.DeleteSong(Playlist.DownloadFolder, Playlist.Name, song.Name, song.IsDownloaded);
         
-        FileHelper.RemoveSongFromPlaylist(_playlist, song.DurationInSeconds);
-        PlaylistTotalHoursLabel.Text = new HourConverter().Convert(_playlist.TotalHours, typeof(string), null, CultureInfo.CurrentCulture).ToString() ?? string.Empty;
-        Songs.Remove(song);
+        FileHelper.RemoveSongFromPlaylist(Playlist, song.DurationInSeconds);
+        PlaylistTotalHoursLabel.Text = new HourConverter().Convert(Playlist.TotalHours, typeof(string), null, CultureInfo.CurrentCulture).ToString() ?? string.Empty;
+        _songs.Remove(song);
         RewriteFilteredSongs();
     }
     
-    private async void RewriteFilteredSongs()
+    private async void OnSongDownloadTapped(object sender, TappedEventArgs e)
     {
-        FilteredSongs.Clear();
-        if (PlaylistSearchBar.Text == "")
+        if (LoadingOverlay.IsVisible) return;
+        if (sender is not Border border) return;
+        if (border.BindingContext is not Song song) return;
+        if (song.IsDownloaded) return;
+        
+        List<Song> songsToBeDownloaded = [song];
+        DownloadSongs(songsToBeDownloaded);
+    }
+    
+    private async void OnDownloadAllTapped(object sender, TappedEventArgs e)
+    {
+        if (LoadingOverlay.IsVisible) return;
+        
+        var songsToBeDownloaded = _songs.Select(s => s).Where(s=> !s.IsDownloaded).ToList();
+        if (songsToBeDownloaded.Count == 0)
         {
-            FilteredSongs = [.._songs];
+            await DisplayAlert("Bilgi", "Listenizdeki tüm şarkılar indirilmiş.");
+            return;
+        }
+        DownloadSongs(songsToBeDownloaded);
+    }
+
+    private async void DownloadSongs(List<Song> songs)
+    {
+        if(songs.Count == 0) return;
+        
+        LoadingOverlay.IsVisible = true;
+        try 
+        {
+            var downloadReport = "";
+            var notDownloadedSongsInfo = "";
+            var durationInSecondsCounter = 0;
+            var songsCounter = 0;
+            ProgressLabel.Text = $"İlerleme: 0/{songs.Count}";
+            
+            List<(Song song, string reason)> notDownloadedSongs = [];
+            foreach (var song in songs)
+            {
+                if (BackendIp == "")
+                {
+                    BackendIp = await DisplayPrompt("İndirme", "8000 portunda backend servisini çalıştıran cihazınızın IPv4 adresini giriniz:");
+                    if (string.IsNullOrWhiteSpace(BackendIp))
+                    {
+                        BackendIp = "";
+                        notDownloadedSongs.Add((song, "Ip bilgisi boş olamaz"));
+                        ErrorLabel.Text = $"{notDownloadedSongs.Count}";
+                        continue;
+                    }
+                }
+                
+                var(opusBytes, durationInSeconds, errorMessage) = await DownloadHelper.DownloadOpusAsync(BackendIp, song.YoutubeUrl);
+                if (opusBytes.Length == 0 || durationInSeconds == 0)
+                {
+                    notDownloadedSongs.Add((song, errorMessage));
+                    ErrorLabel.Text = $"{notDownloadedSongs.Count}";
+                    continue;
+                }
+                
+                song.DurationInSeconds = durationInSeconds;
+                (var success, errorMessage) = AndroidFileService.SaveOpus(opusBytes, song, Playlist);
+                if (!success)
+                {
+                    LoadingOverlay.IsVisible = false;
+                    await DisplayAlert("Hata", errorMessage);
+                    return;
+                }
+
+                durationInSecondsCounter += song.DurationInSeconds;
+                songsCounter++;
+                ProgressLabel.Text = $"İlerleme: {songsCounter}/{songs.Count}";
+            }
+            
+            Playlist.TotalHours += durationInSecondsCounter / 3600.0;
+            downloadReport = $"İndirme başarısı: {songsCounter}/{songs.Count}";
+
+            if (notDownloadedSongs.Count > 0)
+            {
+                Playlist.TotalSongs -= notDownloadedSongs.Count;
+                
+                var failedSongObjects = notDownloadedSongs.Select(x => x.song).ToList();
+                songs.RemoveAll(s => failedSongObjects.Contains(s));
+                
+                var sb = new StringBuilder();
+                sb.AppendLine("İndirilemeyen Şarkılar");
+                sb.AppendLine("----------------------------");
+                foreach (var (song, reason) in notDownloadedSongs)
+                {
+                    sb.AppendLine($"{song.Name}_{song.Artist} - {reason}");
+                }
+
+                notDownloadedSongsInfo = sb.ToString();
+            }
+            
+            var successStatus = AndroidFileService.UpdateNewlyDownloadedSongs(_songs, songs, Playlist.DownloadFolder, Playlist.Name);
+            if (successStatus)
+            {
+                await DisplayAlert("Hata", "songs.json güncellenemedi");
+            }
+            
+            FileHelper.UpdatePlaylist(Playlist);
+            
+            PlaylistTotalHoursLabel.Text = new HourConverter().Convert(Playlist.TotalHours, typeof(string), null, CultureInfo.CurrentCulture).ToString() ?? string.Empty;
+            RewriteFilteredSongs();
+
+            LoadingOverlay.IsVisible = false;
+            
+            if (downloadReport != "")
+            {
+                await DisplayAlert("İndirme Raporu", downloadReport);
+            }
+
+            if (notDownloadedSongsInfo == "") return;
+            
+            var answer = await DisplayAlertWithAnswer("Eksik İndirmeler", "İndirilemeyen şarkıların listesini .txt dosyası olarak almak ister misiniz?");
+            if (!answer) return;
+                
+            var path = Path.Combine(FileSystem.CacheDirectory, $"FailedDownloads_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+            File.WriteAllText(path, notDownloadedSongsInfo);
+
+            var context = Platform.CurrentActivity;
+            if(context == null) return;
+            
+            try
+            {
+                successStatus = AndroidFileService.SaveToDownloads(context, path, "Indirilemeyen_Sarkilar.txt" );
+
+                if (successStatus)
+                {
+                    await DisplayAlert("Bilgi", $"Dosya indirilenler klas�r�ne kaydedildi");
+                }
+                else
+                {
+                    await HandleDownloadTxtFail(notDownloadedSongsInfo);
+                }
+
+            }
+            catch
+            {
+                await HandleDownloadTxtFail(notDownloadedSongsInfo);
+            }
+        }
+        catch (Exception ex)
+        {
+            LoadingOverlay.IsVisible = false;
+            await DisplayAlert("Hata", ex.Message);
+        }
+    }
+    
+    private void RewriteFilteredSongs()
+    {
+        if (_songs == null) return;
+        var searchText = PlaylistSearchBar?.Text?.ToLower() ?? string.Empty;
+        FilteredSongs.Clear();
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            foreach (var s in _songs)
+            {
+                FilteredSongs.Add(s);
+            }
         }
         else
         {
-            var searchText = PlaylistSearchBar.Text.ToLower();
-            foreach (var s in Songs)
+            var filtered = _songs.Where(s => 
+                (s.Name?.Contains(searchText, StringComparison.CurrentCultureIgnoreCase) ?? false) || 
+                (s.Artist?.Contains(searchText, StringComparison.CurrentCultureIgnoreCase) ?? false));
+
+            foreach (var s in filtered)
             {
-                if (s.Name.Contains(searchText, StringComparison.CurrentCultureIgnoreCase) || s.Artist.Contains(searchText, StringComparison.CurrentCultureIgnoreCase))
-                {
-                    FilteredSongs.Add(s);
-                }
+                FilteredSongs.Add(s);
             }
         }
+    }
+    
+    private async Task HandleDownloadTxtFail(string content)
+    {
+        await Clipboard.Default.SetTextAsync(content);
+
+        await DisplayAlert("Dosya indirmesi olu�turulamad�", "İndirilemeyen şarkıların listesi clipboard'a kopyalandı."
+        );
     }
     
     private async Task DisplayAlert(string title, string message)
