@@ -213,6 +213,7 @@ public partial class PlaylistPage : ContentPage
             var durationInSecondsCounter = 0;
             var songsCounter = 0;
             ProgressLabel.Text = $"İlerleme: 0/{songs.Count}";
+            ErrorLabel.Text = "Hata: 0";
             
             List<(Song song, string reason)> notDownloadedSongs = [];
             foreach (var song in songs)
@@ -246,6 +247,7 @@ public partial class PlaylistPage : ContentPage
                     return;
                 }
 
+                song.IsDownloaded = true;
                 durationInSecondsCounter += song.DurationInSeconds;
                 songsCounter++;
                 ProgressLabel.Text = $"İlerleme: {songsCounter}/{songs.Count}";
@@ -256,11 +258,6 @@ public partial class PlaylistPage : ContentPage
 
             if (notDownloadedSongs.Count > 0)
             {
-                Playlist.TotalSongs -= notDownloadedSongs.Count;
-                
-                var failedSongObjects = notDownloadedSongs.Select(x => x.song).ToList();
-                songs.RemoveAll(s => failedSongObjects.Contains(s));
-                
                 var sb = new StringBuilder();
                 sb.AppendLine("İndirilemeyen Şarkılar");
                 sb.AppendLine("----------------------------");

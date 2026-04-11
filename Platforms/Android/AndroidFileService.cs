@@ -258,34 +258,48 @@ public partial class AndroidFileService
     public static (bool, string) SaveOpus(byte[] opusBytes, Song song, Playlist playlist)
     {
         var context = Platform.CurrentActivity;
-        if (context == null || string.IsNullOrEmpty(playlist.DownloadFolder)) return (false, "SaveSong: Context bulunamadı");
-
+        if (context == null) return (false, "Context bulunamadı");
+            
         var treeUri = Uri.Parse(playlist.DownloadFolder);
         var root = DocumentFile.FromTreeUri(context, treeUri);
         if (root == null) return (false, "SaveSong: İndirme klasörü bulunamadı");
-
+            
         var playlistDir = root.FindFile(playlist.Name) ?? root.CreateDirectory(playlist.Name);
         if (playlistDir == null) return (false, "SaveSong: Çalma listesi klasörü bulunamadı");
-        
-        var(success, errorMessage) = SaveOpus(opusBytes, playlistDir, $"{song.Name}");
+            
+        var(success, errorMessage) = SaveOpus(opusBytes, playlistDir, song.Name, song.Artist);
         return !success ? (false, "SaveSong: " + errorMessage) : (true, "");
     }
     
-    private static (bool, string) SaveOpus(byte[] opusBytes, DocumentFile playlistDir, string fileName)
+    private static (bool, string) SaveOpus(byte[] opusBytes, DocumentFile playlistDir, string songName, string artist)
     {
         try
         {
             var context = Platform.CurrentActivity;
             if (context == null) return (false, "SaveOpus: Context bulunamadı");
-
-            var opusFile = playlistDir.CreateFile("audio/opus", fileName + ".opus");
+            
+            var safeFileName = string.Join("_", songName.Split(Path.GetInvalidFileNameChars()));
+            var tempPath = Path.Combine(FileSystem.CacheDirectory, safeFileName + ".opus");
+            File.WriteAllBytes(tempPath, opusBytes);
+            
+            using (var file = TagLib.File.Create(tempPath))
+            {
+                file.Tag.Performers = [artist];
+                file.Tag.Title = songName;
+                file.Save();
+            }
+            
+            var opusFile = playlistDir.CreateFile("audio/opus", safeFileName + ".opus");
             if (opusFile?.Uri == null) return (false, "SaveOpus: .opus oluşturulamadı");
+            
+            using var outputStream = context.ContentResolver?.OpenOutputStream(opusFile.Uri);
+            if (outputStream == null) return (false, "SaveOpus: stream bulunamadı");
+            using var inputStream = File.OpenRead(tempPath);
+            
+            inputStream.CopyTo(outputStream);
+            outputStream.Flush();
+            File.Delete(tempPath);
 
-            using var stream = context.ContentResolver?.OpenOutputStream(opusFile.Uri);
-            if (stream == null) return (false, "SaveOpus: stream bulunamadı");
-
-            stream.Write(opusBytes, 0, opusBytes.Length);
-            stream.Flush();
             return (true, "");
         }
         catch (Exception ex)
