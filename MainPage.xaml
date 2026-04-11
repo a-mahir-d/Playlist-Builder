@@ -2,10 +2,11 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:models="clr-namespace:Playlist_Builder.Models"
+             xmlns:playlistBuilder="clr-namespace:Playlist_Builder"
              x:Class="Playlist_Builder.MainPage"
              NavigationPage.HasNavigationBar="False"
              BackgroundColor="#121212"
-             Padding="10, 0, 10, 0">
+             Padding="10, 0, 10, 0" x:DataType="playlistBuilder:MainPage">
 			 
     <ContentPage.Content>
         <Grid RowDefinitions="Auto, *" RowSpacing="10" Margin="0, 10, 0, 0">

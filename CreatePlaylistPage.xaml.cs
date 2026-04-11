@@ -40,7 +40,7 @@ public partial class CreatePlaylistPage : ContentPage
 
     private async void SaveButton_Clicked(object sender, EventArgs e)
     {
-        var name = PlaylistNameEntry.Text?.Trim() ?? "";
+        var name = PlaylistNameEntry.Text.Trim();
         if (string.IsNullOrWhiteSpace(name) || IconPicker.SelectedIndex < 0)
         {
             await DisplayAlert("Hata", "İsim ve icon seçin.");

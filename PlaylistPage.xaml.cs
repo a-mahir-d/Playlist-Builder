@@ -24,7 +24,7 @@ public partial class PlaylistPage : ContentPage
     
     private List<Song> _songs;
     public ObservableCollection<Song> FilteredSongs { get; set; }
-    private string BackendIp = "";
+    private string _backendIp = "";
     
     public PlaylistPage()
     {
@@ -209,7 +209,6 @@ public partial class PlaylistPage : ContentPage
         LoadingOverlay.IsVisible = true;
         try 
         {
-            var downloadReport = "";
             var notDownloadedSongsInfo = "";
             var durationInSecondsCounter = 0;
             var songsCounter = 0;
@@ -218,19 +217,19 @@ public partial class PlaylistPage : ContentPage
             List<(Song song, string reason)> notDownloadedSongs = [];
             foreach (var song in songs)
             {
-                if (BackendIp == "")
+                if (_backendIp == "")
                 {
-                    BackendIp = await DisplayPrompt("İndirme", "8000 portunda backend servisini çalıştıran cihazınızın IPv4 adresini giriniz:");
-                    if (string.IsNullOrWhiteSpace(BackendIp))
+                    _backendIp = await DisplayPrompt("İndirme", "8000 portunda backend servisini çalıştıran cihazınızın IPv4 adresini giriniz:");
+                    if (string.IsNullOrWhiteSpace(_backendIp))
                     {
-                        BackendIp = "";
+                        _backendIp = "";
                         notDownloadedSongs.Add((song, "Ip bilgisi boş olamaz"));
                         ErrorLabel.Text = $"{notDownloadedSongs.Count}";
                         continue;
                     }
                 }
                 
-                var(opusBytes, durationInSeconds, errorMessage) = await DownloadHelper.DownloadOpusAsync(BackendIp, song.YoutubeUrl);
+                var(opusBytes, durationInSeconds, errorMessage) = await DownloadHelper.DownloadOpusAsync(_backendIp, song.YoutubeUrl);
                 if (opusBytes.Length == 0 || durationInSeconds == 0)
                 {
                     notDownloadedSongs.Add((song, errorMessage));
@@ -253,7 +252,7 @@ public partial class PlaylistPage : ContentPage
             }
             
             Playlist.TotalHours += durationInSecondsCounter / 3600.0;
-            downloadReport = $"İndirme başarısı: {songsCounter}/{songs.Count}";
+            var downloadReport = $"İndirme başarısı: {songsCounter}/{songs.Count}";
 
             if (notDownloadedSongs.Count > 0)
             {
@@ -274,8 +273,9 @@ public partial class PlaylistPage : ContentPage
             }
             
             var successStatus = AndroidFileService.UpdateNewlyDownloadedSongs(_songs, songs, Playlist.DownloadFolder, Playlist.Name);
-            if (successStatus)
+            if (!successStatus)
             {
+                LoadingOverlay.IsVisible = false;
                 await DisplayAlert("Hata", "songs.json güncellenemedi");
                 return;
             }
