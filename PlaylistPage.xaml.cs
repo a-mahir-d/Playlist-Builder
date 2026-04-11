@@ -246,8 +246,7 @@ public partial class PlaylistPage : ContentPage
                     await DisplayAlert("Hata", errorMessage);
                     return;
                 }
-
-                song.IsDownloaded = true;
+                
                 durationInSecondsCounter += song.DurationInSeconds;
                 songsCounter++;
                 ProgressLabel.Text = $"İlerleme: {songsCounter}/{songs.Count}";
@@ -255,7 +254,7 @@ public partial class PlaylistPage : ContentPage
             
             Playlist.TotalHours += durationInSecondsCounter / 3600.0;
             var downloadReport = $"İndirme başarısı: {songsCounter}/{songs.Count}";
-
+            
             if (notDownloadedSongs.Count > 0)
             {
                 var sb = new StringBuilder();
@@ -267,6 +266,15 @@ public partial class PlaylistPage : ContentPage
                 }
 
                 notDownloadedSongsInfo = sb.ToString();
+            }
+            
+            var successfulSongs = songs.Where(s => notDownloadedSongs.All(nds => nds.song.Name != s.Name)).ToList();
+            foreach (var sSong in successfulSongs)
+            {
+                var index = _songs.FindIndex(s => s.Name == sSong.Name && s.Artist == sSong.Artist);
+                if (index == -1) continue;
+                _songs[index].IsDownloaded = true;
+                _songs[index].DurationInSeconds = sSong.DurationInSeconds;
             }
             
             var successStatus = AndroidFileService.UpdateNewlyDownloadedSongs(_songs, songs, Playlist.DownloadFolder, Playlist.Name);
@@ -330,25 +338,29 @@ public partial class PlaylistPage : ContentPage
     {
         if (_songs == null) return;
         var searchText = PlaylistSearchBar?.Text?.ToLower() ?? string.Empty;
-        FilteredSongs.Clear();
-        if (string.IsNullOrWhiteSpace(searchText))
+        
+        MainThread.BeginInvokeOnMainThread(() =>
         {
-            foreach (var s in _songs)
+            FilteredSongs.Clear();
+            if (string.IsNullOrWhiteSpace(searchText))
             {
-                FilteredSongs.Add(s);
+                foreach (var s in _songs)
+                {
+                    FilteredSongs.Add(s);
+                }
             }
-        }
-        else
-        {
-            var filtered = _songs.Where(s => 
-                (s.Name?.Contains(searchText, StringComparison.CurrentCultureIgnoreCase) ?? false) || 
-                (s.Artist?.Contains(searchText, StringComparison.CurrentCultureIgnoreCase) ?? false));
+            else
+            {
+                var filtered = _songs.Where(s => 
+                    (s.Name?.Contains(searchText, StringComparison.CurrentCultureIgnoreCase) ?? false) || 
+                    (s.Artist?.Contains(searchText, StringComparison.CurrentCultureIgnoreCase) ?? false));
 
-            foreach (var s in filtered)
-            {
-                FilteredSongs.Add(s);
+                foreach (var s in filtered)
+                {
+                    FilteredSongs.Add(s);
+                }
             }
-        }
+        });
     }
     
     private async Task HandleDownloadTxtFail(string content)
