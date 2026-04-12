@@ -338,28 +338,21 @@ public partial class PlaylistPage : ContentPage
     {
         if (_songs == null) return;
         var searchText = PlaylistSearchBar?.Text?.ToLower() ?? string.Empty;
-        
+    
         MainThread.BeginInvokeOnMainThread(() =>
         {
-            FilteredSongs.Clear();
-            if (string.IsNullOrWhiteSpace(searchText))
-            {
-                foreach (var s in _songs)
-                {
-                    FilteredSongs.Add(s);
-                }
-            }
-            else
-            {
-                var filtered = _songs.Where(s => 
-                    (s.Name?.Contains(searchText, StringComparison.CurrentCultureIgnoreCase) ?? false) || 
-                    (s.Artist?.Contains(searchText, StringComparison.CurrentCultureIgnoreCase) ?? false));
+            SongsCollectionView.ItemsSource = null; 
 
-                foreach (var s in filtered)
-                {
-                    FilteredSongs.Add(s);
-                }
-            }
+            FilteredSongs.Clear();
+            var filtered = string.IsNullOrWhiteSpace(searchText)
+                ? _songs
+                : _songs.Where(s => (s.Name?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false) || 
+                                    (s.Artist?.Contains(searchText, StringComparison.OrdinalIgnoreCase) ?? false));
+
+            foreach (var s in filtered)
+                FilteredSongs.Add(s);
+            
+            SongsCollectionView.ItemsSource = FilteredSongs;
         });
     }
     
